@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 
 // Vocabulary dataset derived directly from the source list
@@ -1085,28 +1085,79 @@ const questionsData = [
     }
   ];
 
-  const getRandomOptions = (currentIndex, data) => {
-    const currentItem = data[currentIndex];
-    const incorrectOptions = data
-      .filter((_, idx) => idx !== currentIndex)
+  const getRandomOptions = (currentWord, fullDataSet) => {
+    const incorrectOptions = fullDataSet
+      .filter(item => item.word !== currentWord)
       .map(item => item.word);
     
     const shuffledIncorrect = incorrectOptions.sort(() => 0.5 - Math.random()).slice(0, 3);
-    const allOptions = [...shuffledIncorrect, currentItem.word].sort(() => 0.5 - Math.random());
+    const allOptions = [...shuffledIncorrect, currentWord].sort(() => 0.5 - Math.random());
     return allOptions;
   };
   
   export default function App() {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [score, setScore] = useState({ correct: 0, wrong: 0 });
-    const [userAnswers, setUserAnswers] = useState({}); 
-    const [questionOptions, setQuestionOptions] = useState({
-      0: getRandomOptions(0, questionsData)
+    const [activeDataSet, setActiveDataSet] = useState(() => {
+      const saved = localStorage.getItem('vocab_active_dataset');
+      return saved ? JSON.parse(saved) : questionsData;
     });
   
-    const currentQuestion = questionsData[currentIndex];
+    const [currentIndex, setCurrentIndex] = useState(() => {
+      const saved = localStorage.getItem('vocab_current_index');
+      return saved ? parseInt(saved, 10) : 0;
+    });
+  
+    const [score, setScore] = useState(() => {
+      const saved = localStorage.getItem('vocab_score');
+      return saved ? JSON.parse(saved) : { correct: 0, wrong: 0 };
+    });
+  
+    const [userAnswers, setUserAnswers] = useState(() => {
+      const saved = localStorage.getItem('vocab_user_answers');
+      return saved ? JSON.parse(saved) : {};
+    });
+  
+    const [wrongWordsList, setWrongWordsList] = useState(() => {
+      const saved = localStorage.getItem('vocab_wrong_words');
+      return saved ? JSON.parse(saved) : [];
+    });
+  
+    const [isRevisionMode, setIsRevisionMode] = useState(() => {
+      const saved = localStorage.getItem('vocab_is_revision');
+      return saved ? JSON.parse(saved) : false;
+    });
+  
+    // Saved states to remember progress when jumping into revision mode
+    const [savedMainIndex, setSavedMainIndex] = useState(() => {
+      const saved = localStorage.getItem('vocab_saved_main_index');
+      return saved ? parseInt(saved, 10) : 0;
+    });
+  
+    const [savedMainAnswers, setSavedMainAnswers] = useState(() => {
+      const saved = localStorage.getItem('vocab_saved_main_answers');
+      return saved ? JSON.parse(saved) : {};
+    });
+  
+    const [questionOptionsCache, setQuestionOptionsCache] = useState(() => {
+      const saved = localStorage.getItem('vocab_options_cache');
+      return saved ? JSON.parse(saved) : { 0: getRandomOptions(questionsData[0].word, questionsData) };
+    });
+  
+    // Save progress to localStorage
+    useEffect(() => {
+      localStorage.setItem('vocab_active_dataset', JSON.stringify(activeDataSet));
+      localStorage.setItem('vocab_current_index', currentIndex);
+      localStorage.setItem('vocab_score', JSON.stringify(score));
+      localStorage.setItem('vocab_user_answers', JSON.stringify(userAnswers));
+      localStorage.setItem('vocab_wrong_words', JSON.stringify(wrongWordsList));
+      localStorage.setItem('vocab_is_revision', JSON.stringify(isRevisionMode));
+      localStorage.setItem('vocab_saved_main_index', savedMainIndex);
+      localStorage.setItem('vocab_saved_main_answers', JSON.stringify(savedMainAnswers));
+      localStorage.setItem('vocab_options_cache', JSON.stringify(questionOptionsCache));
+    }, [activeDataSet, currentIndex, score, userAnswers, wrongWordsList, isRevisionMode, savedMainIndex, savedMainAnswers, questionOptionsCache]);
+  
+    const currentQuestion = activeDataSet[currentIndex] || activeDataSet[0];
     const currentAnswerState = userAnswers[currentIndex] || { selectedOptions: [], isCorrect: false };
-    const currentOptions = questionOptions[currentIndex] || getRandomOptions(currentIndex, questionsData);
+    const currentOptions = questionOptionsCache[currentIndex] || getRandomOptions(currentQuestion.word, questionsData);
   
     const handleSelectOption = (selectedWord) => {
       if (currentAnswerState.isCorrect) return;
@@ -1114,13 +1165,26 @@ const questionsData = [
       const isCorrect = selectedWord === currentQuestion.word;
       const previouslySelected = currentAnswerState.selectedOptions;
   
+      let updatedWrongCount = score.wrong;
+      let updatedWrongList = [...wrongWordsList];
+  
       if (!isCorrect && !previouslySelected.includes(selectedWord)) {
-        setScore(prev => ({ ...prev, wrong: prev.wrong + 1 }));
+        updatedWrongCount += 1;
+        if (!updatedWrongList.some(item => item.word === currentQuestion.word)) {
+          updatedWrongList.push(currentQuestion);
+        }
       }
   
+      let updatedCorrectCount = score.correct;
       if (isCorrect && !currentAnswerState.isCorrect) {
-        setScore(prev => ({ ...prev, correct: prev.correct + 1 }));
+        updatedCorrectCount += 1;
+        if (isRevisionMode) {
+          updatedWrongList = updatedWrongList.filter(item => item.word !== currentQuestion.word);
+        }
       }
+  
+      setScore({ correct: updatedCorrectCount, wrong: updatedWrongCount });
+      setWrongWordsList(updatedWrongList);
   
       const updatedSelectedOptions = [...new Set([...previouslySelected, selectedWord])];
   
@@ -1134,15 +1198,13 @@ const questionsData = [
     };
   
     const handleNext = () => {
-      if (currentIndex < questionsData.length - 1) {
+      if (currentIndex < activeDataSet.length - 1) {
         const nextIdx = currentIndex + 1;
         setCurrentIndex(nextIdx);
-        
-        if (!questionOptions[nextIdx]) {
-          setQuestionOptions(prev => ({
-            ...prev,
-            [nextIdx]: getRandomOptions(nextIdx, questionsData)
-          }));
+  
+        if (!questionOptionsCache[nextIdx]) {
+          const newOpts = getRandomOptions(activeDataSet[nextIdx].word, questionsData);
+          setQuestionOptionsCache(prev => ({ ...prev, [nextIdx]: newOpts }));
         }
       }
     };
@@ -1153,14 +1215,62 @@ const questionsData = [
       }
     };
   
-    const isCompleted = currentIndex === questionsData.length - 1 && currentAnswerState.isCorrect;
+    const startRevision = () => {
+      if (wrongWordsList.length === 0) return;
+  
+      // Save current main session progress before switching
+      setSavedMainIndex(currentIndex);
+      setSavedMainAnswers(userAnswers);
+  
+      // Switch to revision dataset
+      setActiveDataSet(wrongWordsList);
+      setCurrentIndex(0);
+      setScore({ correct: 0, wrong: 0 });
+      setUserAnswers({});
+      setIsRevisionMode(true);
+  
+      const newCache = { 0: getRandomOptions(wrongWordsList[0].word, questionsData) };
+      setQuestionOptionsCache(newCache);
+    };
+  
+    const exitRevision = () => {
+      // Restore main dataset and exact previous progress/position
+      setActiveDataSet(questionsData);
+      setCurrentIndex(savedMainIndex);
+      setUserAnswers(savedMainAnswers);
+      setScore({ correct: 0, wrong: 0 });
+      setIsRevisionMode(false);
+  
+      // Regenerate options cache for the restored main index position
+      const restoredWord = questionsData[savedMainIndex].word;
+      setQuestionOptionsCache({ [savedMainIndex]: getRandomOptions(restoredWord, questionsData) });
+    };
+  
+    const isCompleted = currentIndex === activeDataSet.length - 1 && currentAnswerState.isCorrect;
   
     return (
       <div className="app-container">
         {/* Custom Banner Title */}
         <div className="app-banner">
           <h1>🌟 Vocabulary Master 🌟</h1>
-          <p>Specially Built for Anna & Aiden</p>
+          <p>Specially Built for Anna & Aiden by their dad Kishor Joseph</p>
+        </div>
+  
+        {/* Revision Control Header */}
+        <div className="control-bar">
+          {isRevisionMode ? (
+            <button className="mode-btn exit" onClick={exitRevision}>
+              📖 Exit Revision Mode
+            </button>
+          ) : (
+            <button 
+              className="mode-btn revise" 
+              onClick={startRevision}
+              disabled={wrongWordsList.length === 0}
+            >
+              🔄 Revise Wrongly Answered ({wrongWordsList.length})
+            </button>
+          )}
         </div>
   
         {/* Top Score Bar */}
@@ -1170,8 +1280,10 @@ const questionsData = [
         </header>
   
         <main className="card">
-          <div className="progress-indicator">
-            Question {currentIndex + 1} of {questionsData.length}
+          <div className="progress-header">
+            <div className="progress-indicator">
+              {isRevisionMode ? "Revision Mode — " : ""} Question {currentIndex + 1} of {activeDataSet.length}
+            </div>
           </div>
   
           <h2 className="definition-title">What word matches this definition?</h2>
@@ -1226,7 +1338,7 @@ const questionsData = [
             <button 
               className="nav-btn primary" 
               onClick={handleNext} 
-              disabled={!currentAnswerState.isCorrect || currentIndex === questionsData.length - 1}
+              disabled={!currentAnswerState.isCorrect || currentIndex === activeDataSet.length - 1}
             >
               Next ➡️
             </button>
@@ -1234,7 +1346,10 @@ const questionsData = [
   
           {isCompleted && (
             <div className="completion-banner">
-              <h2>🏆 Amazing! You completed all vocabulary challenges!</h2>
+              <h2>🏆 Amazing! You completed this session!</h2>
+              <button className="nav-btn primary" onClick={exitRevision} style={{marginTop: '10px'}}>
+                Return to Full Word List
+              </button>
             </div>
           )}
         </main>

@@ -18,14 +18,13 @@ body {
   text-align: center;
   padding: 20px;
   border-radius: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
 }
 
 .app-banner h1 {
   margin: 0 0 5px 0;
   font-size: 1.8rem;
-  letter-spacing: 0.5px;
 }
 
 .app-banner p {
@@ -33,6 +32,50 @@ body {
   font-size: 1rem;
   font-weight: 300;
   opacity: 0.9;
+}
+
+/* Control Bar for Revision */
+.control-bar {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: center;
+}
+
+.mode-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  transition: background 0.2s;
+}
+
+.mode-btn.revise {
+  background: #ff9800;
+  color: white;
+}
+
+.mode-btn.revise:hover:not(:disabled) {
+  background: #f57c00;
+}
+
+.mode-btn.revise:disabled {
+  background: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.mode-btn.exit {
+  background: #e91e63;
+  color: white;
+}
+
+.mode-btn.exit:hover {
+  background: #c2185b;
 }
 
 .score-header {
