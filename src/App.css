@@ -7,8 +7,32 @@ body {
 
 .app-container {
   max-width: 600px;
-  margin: 30px auto;
+  margin: 20px auto;
   padding: 20px;
+}
+
+/* Banner Styling */
+.app-banner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-align: center;
+  padding: 20px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+}
+
+.app-banner h1 {
+  margin: 0 0 5px 0;
+  font-size: 1.8rem;
+  letter-spacing: 0.5px;
+}
+
+.app-banner p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 300;
+  opacity: 0.9;
 }
 
 .score-header {

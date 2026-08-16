@@ -1085,169 +1085,159 @@ const questionsData = [
     }
   ];
 
-// Helper function to shuffle options
-const getRandomOptions = (currentIndex, data) => {
-  const currentItem = data[currentIndex];
-  const incorrectOptions = data
-    .filter((_, idx) => idx !== currentIndex)
-    .map(item => item.word);
+  const getRandomOptions = (currentIndex, data) => {
+    const currentItem = data[currentIndex];
+    const incorrectOptions = data
+      .filter((_, idx) => idx !== currentIndex)
+      .map(item => item.word);
+    
+    const shuffledIncorrect = incorrectOptions.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const allOptions = [...shuffledIncorrect, currentItem.word].sort(() => 0.5 - Math.random());
+    return allOptions;
+  };
   
-  const shuffledIncorrect = incorrectOptions.sort(() => 0.5 - Math.random()).slice(0, 3);
-  const allOptions = [...shuffledIncorrect, currentItem.word].sort(() => 0.5 - Math.random());
-  return allOptions;
-};
-
-export default function App() {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  export default function App() {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [score, setScore] = useState({ correct: 0, wrong: 0 });
+    const [userAnswers, setUserAnswers] = useState({}); 
+    const [questionOptions, setQuestionOptions] = useState({
+      0: getRandomOptions(0, questionsData)
+    });
   
-  // Track global counts
-  const [score, setScore] = useState({ correct: 0, wrong: 0 });
+    const currentQuestion = questionsData[currentIndex];
+    const currentAnswerState = userAnswers[currentIndex] || { selectedOptions: [], isCorrect: false };
+    const currentOptions = questionOptions[currentIndex] || getRandomOptions(currentIndex, questionsData);
   
-  // Track answer states per question index
-  // stores: { [index]: { selectedOptions: string[], isCorrect: boolean } }
-  const [userAnswers, setUserAnswers] = useState({}); 
+    const handleSelectOption = (selectedWord) => {
+      if (currentAnswerState.isCorrect) return;
   
-  // Cache options per question so they don't reshuffle when using back/next buttons
-  const [questionOptions, setQuestionOptions] = useState({
-    0: getRandomOptions(0, questionsData)
-  });
-
-  const currentQuestion = questionsData[currentIndex];
-  const currentAnswerState = userAnswers[currentIndex] || { selectedOptions: [], isCorrect: false };
-  const currentOptions = questionOptions[currentIndex] || getRandomOptions(currentIndex, questionsData);
-
-  const handleSelectOption = (selectedWord) => {
-    // If already answered correctly, lock interaction
-    if (currentAnswerState.isCorrect) return;
-
-    const isCorrect = selectedWord === currentQuestion.word;
-    const previouslySelected = currentAnswerState.selectedOptions;
-
-    // Only increment wrong count if this specific wrong button hasn't been clicked yet for this question
-    if (!isCorrect && !previouslySelected.includes(selectedWord)) {
-      setScore(prev => ({ ...prev, wrong: prev.wrong + 1 }));
-    }
-
-    // If it's newly correct, increment correct count
-    if (isCorrect && !currentAnswerState.isCorrect) {
-      setScore(prev => ({ ...prev, correct: prev.correct + 1 }));
-    }
-
-    const updatedSelectedOptions = [...new Set([...previouslySelected, selectedWord])];
-
-    setUserAnswers(prev => ({
-      ...prev,
-      [currentIndex]: {
-        selectedOptions: updatedSelectedOptions,
-        isCorrect: isCorrect || currentAnswerState.isCorrect
+      const isCorrect = selectedWord === currentQuestion.word;
+      const previouslySelected = currentAnswerState.selectedOptions;
+  
+      if (!isCorrect && !previouslySelected.includes(selectedWord)) {
+        setScore(prev => ({ ...prev, wrong: prev.wrong + 1 }));
       }
-    }));
-  };
-
-  const handleNext = () => {
-    if (currentIndex < questionsData.length - 1) {
-      const nextIdx = currentIndex + 1;
-      setCurrentIndex(nextIdx);
-      
-      // Generate options for next question if not already cached
-      if (!questionOptions[nextIdx]) {
-        setQuestionOptions(prev => ({
-          ...prev,
-          [nextIdx]: getRandomOptions(nextIdx, questionsData)
-        }));
+  
+      if (isCorrect && !currentAnswerState.isCorrect) {
+        setScore(prev => ({ ...prev, correct: prev.correct + 1 }));
       }
-    }
-  };
-
-  const handleBack = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
-
-  const isCompleted = currentIndex === questionsData.length - 1 && currentAnswerState.isCorrect;
-
-  return (
-    <div className="app-container">
-      {/* Top Score Bar */}
-      <header className="score-header">
-        <div className="score-badge correct">✅ Correct: {score.correct}</div>
-        <div className="score-badge wrong">❌ Wrong: {score.wrong}</div>
-      </header>
-
-      <main className="card">
-        <div className="progress-indicator">
-          Question {currentIndex + 1} of {questionsData.length}
+  
+      const updatedSelectedOptions = [...new Set([...previouslySelected, selectedWord])];
+  
+      setUserAnswers(prev => ({
+        ...prev,
+        [currentIndex]: {
+          selectedOptions: updatedSelectedOptions,
+          isCorrect: isCorrect || currentAnswerState.isCorrect
+        }
+      }));
+    };
+  
+    const handleNext = () => {
+      if (currentIndex < questionsData.length - 1) {
+        const nextIdx = currentIndex + 1;
+        setCurrentIndex(nextIdx);
+        
+        if (!questionOptions[nextIdx]) {
+          setQuestionOptions(prev => ({
+            ...prev,
+            [nextIdx]: getRandomOptions(nextIdx, questionsData)
+          }));
+        }
+      }
+    };
+  
+    const handleBack = () => {
+      if (currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+      }
+    };
+  
+    const isCompleted = currentIndex === questionsData.length - 1 && currentAnswerState.isCorrect;
+  
+    return (
+      <div className="app-container">
+        {/* Custom Banner Title */}
+        <div className="app-banner">
+          <h1>🌟 Vocabulary Master 🌟</h1>
+          <p>Specially Built for Anna & Aiden</p>
         </div>
-
-        {/* Meaning sentence prompt */}
-        <h2 className="definition-title">What word matches this definition?</h2>
-        <p className="definition-text">"{currentQuestion.definition}"</p>
-
-        {/* Options Buttons */}
-        <div className="options-grid">
-          {currentOptions.map((optionWord, idx) => {
-            let btnClass = "option-btn";
-            const isSelected = currentAnswerState.selectedOptions.includes(optionWord);
-
-            if (currentAnswerState.isCorrect && optionWord === currentQuestion.word) {
-              btnClass += " correct-highlight"; // Only highlight correct once solved
-            } else if (isSelected) {
-              btnClass += " wrong-highlight"; // Highlights user's wrong guess in red
-            }
-
-            return (
-              <button
-                key={idx}
-                className={btnClass}
-                onClick={() => handleSelectOption(optionWord)}
-              >
-                {optionWord}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Error Feedback & Example Sentence */}
-        {currentAnswerState.selectedOptions.length > 0 && !currentAnswerState.isCorrect && (
-          <div className="error-box">
-            <p className="oops-text">⚠️ Oops! That's incorrect.</p>
-            <p className="hint-label">Read this example sentence to guess the right word:</p>
-            <p className="example-text">"{currentQuestion.example}"</p>
+  
+        {/* Top Score Bar */}
+        <header className="score-header">
+          <div className="score-badge correct">✅ Correct: {score.correct}</div>
+          <div className="score-badge wrong">❌ Wrong: {score.wrong}</div>
+        </header>
+  
+        <main className="card">
+          <div className="progress-indicator">
+            Question {currentIndex + 1} of {questionsData.length}
           </div>
-        )}
-
-        {currentAnswerState.isCorrect && (
-          <div className="success-box">
-            <p>🎉 Spot on! Great job.</p>
+  
+          <h2 className="definition-title">What word matches this definition?</h2>
+          <p className="definition-text">"{currentQuestion.definition}"</p>
+  
+          <div className="options-grid">
+            {currentOptions.map((optionWord, idx) => {
+              let btnClass = "option-btn";
+              const isSelected = currentAnswerState.selectedOptions.includes(optionWord);
+  
+              if (currentAnswerState.isCorrect && optionWord === currentQuestion.word) {
+                btnClass += " correct-highlight";
+              } else if (isSelected) {
+                btnClass += " wrong-highlight";
+              }
+  
+              return (
+                <button
+                  key={idx}
+                  className={btnClass}
+                  onClick={() => handleSelectOption(optionWord)}
+                >
+                  {optionWord}
+                </button>
+              );
+            })}
           </div>
-        )}
-
-        {/* Navigation Buttons */}
-        <div className="nav-buttons">
-          <button 
-            className="nav-btn" 
-            onClick={handleBack} 
-            disabled={currentIndex === 0}
-          >
-            ⬅️ Back
-          </button>
-
-          <button 
-            className="nav-btn primary" 
-            onClick={handleNext} 
-            disabled={!currentAnswerState.isCorrect || currentIndex === questionsData.length - 1}
-          >
-            Next ➡️
-          </button>
-        </div>
-
-        {isCompleted && (
-          <div className="completion-banner">
-            <h2>🏆 Amazing! You completed all vocabulary challenges!</h2>
+  
+          {currentAnswerState.selectedOptions.length > 0 && !currentAnswerState.isCorrect && (
+            <div className="error-box">
+              <p className="oops-text">⚠️ Oops! That's incorrect.</p>
+              <p className="hint-label">Read this example sentence to guess the right word:</p>
+              <p className="example-text">"{currentQuestion.example}"</p>
+            </div>
+          )}
+  
+          {currentAnswerState.isCorrect && (
+            <div className="success-box">
+              <p>🎉 Spot on! Great job.</p>
+            </div>
+          )}
+  
+          <div className="nav-buttons">
+            <button 
+              className="nav-btn" 
+              onClick={handleBack} 
+              disabled={currentIndex === 0}
+            >
+              ⬅️ Back
+            </button>
+  
+            <button 
+              className="nav-btn primary" 
+              onClick={handleNext} 
+              disabled={!currentAnswerState.isCorrect || currentIndex === questionsData.length - 1}
+            >
+              Next ➡️
+            </button>
           </div>
-        )}
-      </main>
-    </div>
-  );
-}
+  
+          {isCompleted && (
+            <div className="completion-banner">
+              <h2>🏆 Amazing! You completed all vocabulary challenges!</h2>
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
